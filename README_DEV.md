@@ -21,6 +21,35 @@ their scene dependencies, and the Inspector wiring required to reuse them.
   and `Focus`. They share an exclusive `ToggleGroup` and call the visualization controller
   directly; their former `UIThemeManager.ApplyTheme` callbacks have been removed.
 
+## 002SettingUI dropdowns
+
+Scene: `Assets/MRF/Scenes/SettingUI/002SettingUI.unity`
+
+The Themes and Visualization Mode button grids were replaced visually by dropdowns cloned
+from the local Seated Mode control. The former `ThemeGridLayout` and `PassthroughGridLayout`
+remain inactive in the scene as recoverable references; they do not participate in layout or
+receive input.
+
+No additional runtime adapter is required in this scene. Each `DropDownGroup` owns an explicit,
+ordered Toggle list and forwards its selected integer through one visible Inspector event:
+
+| Dropdown | Explicit option order | Inspector event target |
+|---|---|---|
+| `ThemeDropdownGridLayout` | Dark Theme, Light Theme, Custom Theme 1, Custom Theme 2 | `ContentRoot > UIThemeManager.ApplyTheme(int)` |
+| `VisualizationModeDropdownGridLayout` | Virtual, Passthrough, Focus | `[BuildingBlock] Passthrough > VisualizationModeController.SetMode(int)` |
+
+Both events use the dynamic `Int32` value emitted by `DropDownGroup`; no constant argument is
+stored. Each cloned dropdown has its own `ToggleGroup`, so selections in Themes, Visualization
+Mode, or Seated Mode cannot affect one another. The Toggle arrays are serialized explicitly,
+which avoids hierarchy searches and ambiguity when additional menus are added.
+
+Design responsibilities remain separated:
+
+- `DropDownGroup` owns presentation, expansion, option ordering, and exclusive selection.
+- `UIThemeManager` owns theme application.
+- `VisualizationModeController` owns the complete Virtual/Passthrough/Focus state.
+- UnityEvents connect UI to behavior visibly in the Inspector.
+
 ## Visualization module
 
 ### Files
@@ -162,6 +191,13 @@ This module predates the explicit-reference rule and still discovers Meta locomo
 and teleport interactors in the scene. Refactor it separately before supporting multiple rigs.
 
 ## Change log
+
+### 2026-08-28 — 002SettingUI dropdown conversion
+
+- Replaced the active Themes and Visualization Mode button grids with independent dropdowns.
+- Serialized all option Toggle references in enum/theme order.
+- Connected visible dynamic-Int32 events directly to the existing domain controllers.
+- Kept the former button grids inactive for safe visual comparison or recovery.
 
 ### 2026-08-28 — Visualization modes
 
