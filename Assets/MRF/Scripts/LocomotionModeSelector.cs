@@ -43,6 +43,20 @@ public sealed class LocomotionModeSelector : MonoBehaviour
         SelectStyle(MovingSetting.MovementStyle.Slide, forceRefresh: false);
     }
 
+    /// <summary>Receives the option index emitted by the locomotion dropdown.</summary>
+    public void SetMode(int selectedIndex)
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                SelectTeleport();
+                break;
+            case 1:
+                SelectContinuous();
+                break;
+        }
+    }
+
     public void OnTeleportValueChanged(bool isOn)
     {
         if (isOn && !updatingToggles)

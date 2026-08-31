@@ -170,27 +170,53 @@ currently selected index. Afterwards, the visible `When Selection Changed` event
 all changes. There are no automatic scene searches, so another menu cannot be selected by
 mistake.
 
-## Seated Mode dropdown
+## Player Stance dropdown
+
+Scene: `Assets/MRF/Scenes/SettingUI/004SettingUI.unity`
 
 - Adapter: `Assets/MRF/Scripts/SeatedModeDropdownAdapter.cs`
 - Meta setting controlled: `Oculus.Interaction.Locomotion.StandingSetting`
-- Mapping: `0 = Standing`, `1 = Seating`
+- Mapping: `0 = Standing` (default), `1 = Seating`
+- The dropdown header starts as `Standing`.
+- The ordered toggle references are serialized explicitly: Standing first, Seating second.
 
 This is separate from visualization. Seated mode changes the user's stance/height handling;
 it does not change the skybox, floor, Passthrough, or camera background.
 
-## Locomotion selector
+## Locomotion Mode dropdown
+
+Scene: `Assets/MRF/Scenes/SettingUI/004SettingUI.unity`
+
+- Heading: `Locomotion Mode`.
+- Options: `0 = Teleport`, `1 = Continuous`.
+- Dropdown: `LocomotionModeDropdownGridLayout`.
+- `DropDownGroup.WhenSelectionChanged(Int32)` calls
+  `WristPanelMenuSystem > LocomotionModeSelector.SetMode(int)`.
+- The option array and both Toggle references are assigned explicitly.
+- `Teleport` is the initial selection.
+
+### Locomotion selector
 
 - Script: `Assets/MRF/Scripts/LocomotionModeSelector.cs`
 - Modes: Teleport and Continuous/Slide.
-- The two UI toggles are placed in one `ToggleGroup` with `Allow Switch Off` disabled.
+- The two dropdown options use one `ToggleGroup` with `Allow Switch Off` disabled.
 - The selector updates Meta `MovingSetting` instances and enables teleport interactors only
   while Teleport is selected.
 
-This module predates the explicit-reference rule and still discovers Meta locomotion settings
-and teleport interactors in the scene. Refactor it separately before supporting multiple rigs.
+This module still discovers Meta locomotion settings and teleport interactors because hand and
+controller rigs can each own an instance. Refactor that SDK-object discovery separately before
+supporting multiple independent player rigs.
 
 ## Change log
+
+### 2026-08-31  Player Stance and Locomotion dropdown
+
+- Renamed the visible `Seated Mode` section to `Player Stance`.
+- Added the two-option `Locomotion Mode` dropdown to `004SettingUI`; `002SettingUI` remains unchanged.
+- Connected its dynamic integer event to `LocomotionModeSelector.SetMode(int)`.
+- Assigned the dropdown toggles explicitly to the selector.
+- Set Player Stance to `Standing` by default in `004SettingUI` and serialized its dropdown references.
+
 
 ### 2026-08-28 — 002SettingUI dropdown conversion
 
