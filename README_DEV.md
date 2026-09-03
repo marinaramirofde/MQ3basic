@@ -207,6 +207,28 @@ This module still discovers Meta locomotion settings and teleport interactors be
 controller rigs can each own an instance. Refactor that SDK-object discovery separately before
 supporting multiple independent player rigs.
 
+## Language localization
+
+Scene: `Assets/MRF/Scenes/SettingUI/004SettingUI.unity`
+
+- Uses Unity Localization `1.5.9` and its Addressables dependency.
+- Locales and the `Settings UI` String Table are under `Assets/MRF/Localization`.
+- Dropdown order: `0 = English`, `1 = Español`; English is the serialized default and its visible dynamic event calls `LanguageDropdownAdapter.SetLanguage(int)`.
+- All dropdown, Locale and Toggle references are assigned explicitly in the Inspector.
+- Startup priority is saved PlayerPrefs locale, Quest/system locale, then English fallback; the adapter writes the `selected-locale` key on each user change. This follows Meta's recommended behavior for unsupported device languages.
+- Add future translations by creating another Locale/table column, then add its explicit dropdown option and adapter reference.
+
+### Localization ownership
+
+The reusable template owns localization for settings and common system UI: settings titles and
+options, shared buttons, confirmations, loading states, permission prompts, generic errors, and
+basic interaction or accessibility instructions. Add `LocalizeStringEvent` explicitly to each
+template-owned user-facing text, preferably on its source prefab.
+
+Each project owns its scene-specific content: narrative, dialogue, subtitles, objectives,
+tutorials, object names and descriptions, and localized voice or media. Keep that content in
+separate project-specific String or Asset Table Collections instead of adding it to `Settings UI`.
+
 ## Change log
 
 ### 2026-08-31  Player Stance and Locomotion dropdown
