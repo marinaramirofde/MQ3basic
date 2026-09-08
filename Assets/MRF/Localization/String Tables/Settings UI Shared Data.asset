@@ -79,6 +79,18 @@ MonoBehaviour:
     m_Key: LANGUAGE
     m_Metadata:
       m_Items: []
+  - m_Id: 1331535887
+    m_Key: DOMINANT_HAND
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535888
+    m_Key: LEFT
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535889
+    m_Key: RIGHT
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

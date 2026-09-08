@@ -82,6 +82,18 @@ MonoBehaviour:
     m_Localized: Idioma
     m_Metadata:
       m_Items: []
+  - m_Id: 1331535887
+    m_Localized: Mano dominante
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535888
+    m_Localized: Izquierda
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535889
+    m_Localized: Derecha
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

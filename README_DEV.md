@@ -282,3 +282,124 @@ separate project-specific String or Asset Table Collections instead of adding it
   `SetVirtual`, `SetPassthrough`, and `SetFocus`; added an exclusive ToggleGroup.
 - Changed virtual-environment control from whole GameObjects to explicit Renderers, keeping
   the Floor BoxCollider active in Passthrough and Focus so locomotion cannot fall through it.
+
+## 004HandMenu: dominant hand (2026-09-08)
+
+Scene: `Assets/MRF/Scenes/HandMenuUI/004HandMenu.unity`.
+Both `SettingsMenuWorldRoot_TwoColumns` and `SettingsMenuWorldRoot_OneColumn`
+contain `DominantHandSection` and `DominantHandDropdown`. The two-column control
+fills the third row of ColumnLeft. The one-column control follows Language; its
+existing layout group and content-size fitter accommodate the added controls.
+The inactive alternative menu remains inactive until explicitly selected.
+
+### Ownership and Inspector wiring
+
+`Assets/MRF/Scripts/Settings/DominantHandWristSelector.cs` is the single owner of
+this preference, attached to the always-active `WatchWristSystem`. Its explicit
+references are WatchVisual, LeftWristAnchor/LeftWatchMount, and
+RightWristAnchor/RightWatchMount. Default Hand is Left. The public enum and
+integer events use stable values: 0 = Left, 1 = Right. Do not reorder these values;
+they are also the persisted representation under PlayerPrefs key `dominant-hand`.
+New installations use Left; existing saved Left/Right preferences remain unchanged.
+Invalid saved values fall back to the Inspector default. The scene also places
+WatchVisual under LeftWatchMount and selects Left in both dropdowns in edit mode.
+This is an application preference, independent of the headset's system menu hand.
+
+The selector restores the preference in Awake and reparents WatchVisual to the
+selected mount. It resets local position/rotation and preserves the authored
+visual scale. Calibrate each wrist separately on its WatchMount in the Inspector;
+keep model-specific adjustments on the visual's children. The existing Meta
+HandJoint components continue driving the wrist anchors. No custom Update loop,
+scene search, rig reparenting, or SDK source modification is involved.
+
+Each `DominantHandDropdownAdapter` explicitly references the shared selector,
+its own DropDownGroup, Left/Right Toggles, and their Title text components.
+The dropdown's serialized dynamic `WhenSelectionChanged(Int32)` event calls that
+adapter's `SetDominantHand(int)`. Its Toggle array and ToggleGroup are also
+serialized. The adapter injects the same ordered options automatically and
+subscribes/unsubscribes to preference and localization events with its lifecycle.
+It synchronizes when enabled, so reopening the inactive alternative does not
+replace the saved preference. UI refreshes do not write PlayerPrefs or recursively
+change the setting. Actual user changes persist immediately.
+
+### Translation and future integrations
+
+The Settings UI collection now includes DOMINANT_HAND, LEFT, and RIGHT in English
+and Spanish: Dominant Hand / Mano dominante, Left / Izquierda, Right / Derecha.
+The heading uses an explicit LocalizeStringEvent. The adapter's serialized
+LocalizedString references update both option titles and the closed header when
+the locale changes; Meta's dropdown normally copies the header only on selection.
+Add future locale columns to the same table, without changing handedness code.
+
+Future tools, weapons, and menu launchers can subscribe to `HandChanged` and read
+`CurrentHand`, or use the selector's visible `When Hand Changed (Int32)` event.
+That Inspector event also publishes the initial value in Start. Integrations
+activated later should read CurrentHand when enabled. This change moves the watch;
+it does not implement the future watch menu button or remap unrelated grab/input
+bindings. Keep the selector on an active rig/service object, outside either menu.
+
+### Validation and Meta publication
+
+The two scripts compile with Unity 6000.3.21f1 Roslyn and the project's installed
+Unity/Meta/Localization assembly references. Static scene checks passed for unique
+file IDs, new local component references, parent-child links, both dynamic
+handedness callbacks, and unique matching translation entry IDs. These checks do
+not substitute for importing the scene and exercising it in Play Mode/on Quest.
+
+Before release, test both menu variants with English and Spanish, switch Left to
+Right and back, reopen the menu, restart the app, and confirm saved selection,
+header text, and watch placement. Check both calibrated mounts while rotating the
+wrists, opening dropdowns near panel edges, changing themes, and changing stance.
+Test tracking loss/recovery, hands/controllers switching, and the system menu on
+the actual headset. Existing HandJoint tracking owns anchor updates; this feature
+does not add a controller fallback or tracking-loss visibility policy. Validate
+those behaviors against the input modes declared by the application.
+
+Meta's VRC overview is the release baseline:
+https://developers.meta.com/horizon/resources/publish-quest-req/
+In particular, verify declared input support (Tracking.2), hand pose/orientation
+(Input.5 guidance), and hand/controller switching (Input.7):
+https://developers.meta.com/horizon/resources/vrc-quest-input-5/
+https://developers.meta.com/horizon/resources/vrc-quest-input-7/
+The code does not intercept Meta system gestures or modify platform permissions.
+Publication compliance has not been certified: device interaction, performance,
+and the remaining app-wide VRC checks still require release validation.
+
+## Dropdown placement within the interaction panel (2026-09-08)
+
+The installed Meta UI Set Dropdown1LineTextOnly variant inherits its popup setup
+from the icon/text dropdown prefabs. The popup uses an override-sorting Canvas,
+GraphicRaycaster, CanvasGroupAlphaToggle, and DisableRaycaster. DropDownGroup
+owns selection and closes the header after choosing an option. These installed
+components do not implement automatic edge placement or enlarge the parent
+ClippedPlaneSurface. A visually overflowing list can therefore leave the finite
+ray interaction area even though its own Canvas still renders it.
+
+Meta's design guidance recommends fitting dropdown options in the visible area
+and avoiding scrolling where possible. This is design guidance, not evidence
+that every Horizon OS system menu uses the same Unity implementation:
+https://developers.meta.com/horizon/design/dropdowns/
+https://developers.meta.com/horizon/design/dropdowns_implementation/
+
+`Assets/MRF/Scripts/Settings/DropdownPanelPlacement.cs` is a project extension
+attached to all twelve settings dropdown groups in 004HandMenu. The header
+Toggle's explicit dynamic Boolean event calls SetOpen after Meta's existing
+visibility event. Inspector references identify the popup RectTransform, header,
+and the actual ISDK_RayInteraction/Surface RectTransform of its settings panel.
+Margin defaults to six UI units. No runtime hierarchy discovery is used.
+
+On opening, the component resolves layout once and measures world corners in
+interaction-surface coordinates. It places the popup below its header when it
+fits, otherwise above, and clamps it inside the panel. Option order, model depth,
+selection events, localization, and Meta's visual/interaction components remain
+unchanged. Existing popup LayoutElements ignore the parent layout, so the parent
+does not overwrite this position. There is no new Update loop and no permanently
+enlarged invisible ray surface. Larger future lists need a scrollable design or
+fewer options if they exceed the panel; the component logs an actionable warning.
+
+Validation: compiled with Unity Roslyn and installed project assemblies; verified
+all twelve serialized callbacks/references, unique scene IDs, and popup layout
+exclusion. Device and Play Mode interaction have not been exercised here. Before
+release, open each dropdown in both layouts, select every option using ray and
+poke, close/reopen, switch languages, and verify bottom-row lists remain fully
+inside the surface. Repeat after changing panel size or adding options.

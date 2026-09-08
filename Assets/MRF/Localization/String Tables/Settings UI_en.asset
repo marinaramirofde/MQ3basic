@@ -82,6 +82,18 @@ MonoBehaviour:
     m_Localized: Language
     m_Metadata:
       m_Items: []
+  - m_Id: 1331535887
+    m_Localized: Dominant Hand
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535888
+    m_Localized: Left
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1331535889
+    m_Localized: Right
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
