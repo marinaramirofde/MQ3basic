@@ -7,11 +7,30 @@ their scene dependencies, and the Inspector wiring required to reuse them.
 
 - Custom runtime code lives under `Assets/MRF/Scripts` and is grouped by feature.
 - SDK/package source is never modified. All custom behavior is implemented in `Assets/MRF`.
-- Scene references are assigned explicitly in the Inspector. Runtime searches by name or type
-  are avoided in new modules because a scene may contain several menus or rigs.
-- Public methods are small entry points that can be connected to UnityEvents.
-- Code comments and XML documentation are written in descriptive English.
-- Update this guide whenever a custom module or Inspector connection changes.
+- Prefer explicit `[SerializeField]` references assigned in the Inspector. Avoid runtime searches
+  by name or type because a scene may contain several menus or rigs.
+- Keep UI-to-behavior connections visible through `OnClick`, `OnValueChanged`, or another
+  serialized UnityEvent. Public event handlers are small and named after the user action.
+- Automate repetitive setup only when it reduces error without hiding ownership. Any runtime
+  discovery or generated object must be isolated in a clearly named method and documented here.
+- Keep classes focused and methods short. A feature should have one obvious controller instead
+  of behavior distributed across unrelated objects.
+- Comments and XML documentation are written in English. They explain intent, constraints, or
+  non-obvious SDK behavior; they do not narrate self-explanatory lines.
+- Log only important state changes and actionable problems. Use `Debug.Log` for a successful
+  user-visible mode change, `Debug.LogWarning` for a recoverable fallback, and `Debug.LogError`
+  for missing required setup. Never log every frame or every routine callback.
+- Update this guide whenever a custom module, Inspector reference, UnityEvent, important log,
+  or intentional automation changes.
+
+### Current exceptions to explicit Inspector wiring
+
+- `SeatedModeDropdownAdapter.ConfigureOptions()` finds `Standing` and `Seating` toggles below
+  its dropdown. Replace this with serialized Toggle references when that module is next edited.
+- `LocomotionModeSelector` searches for every `MovingSetting` and `TeleportInteractor` because
+  the current Meta hand and controller rigs may each own an instance. This exception is isolated
+  in `ResolveMovingSettings()` and `SetTeleportInteractorsActive()`; revisit it before supporting
+  multiple independent player rigs.
 
 ## Current scene
 
@@ -178,7 +197,9 @@ Scene: `Assets/MRF/Scenes/SettingUI/004SettingUI.unity`
 - Meta setting controlled: `Oculus.Interaction.Locomotion.StandingSetting`
 - Mapping: `0 = Standing` (default), `1 = Seating`
 - The dropdown header starts as `Standing`.
-- The ordered toggle references are serialized explicitly: Standing first, Seating second.
+- `DropDownGroup` receives the options in Standing/Seating order. The adapter currently finds
+  those toggles by name under its own dropdown; this is a documented exception to the preferred
+  explicit-reference convention.
 
 This is separate from visualization. Seated mode changes the user's stance/height handling;
 it does not change the skybox, floor, Passthrough, or camera background.
