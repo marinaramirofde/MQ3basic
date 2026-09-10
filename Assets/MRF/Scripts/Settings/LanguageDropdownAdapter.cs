@@ -23,7 +23,9 @@ public sealed class LanguageDropdownAdapter : MonoBehaviour
     [SerializeField] private Toggle englishToggle;
     [SerializeField] private Toggle spanishToggle;
 
-    private AsyncOperationHandle<Locale> initializationOperation;
+    private AsyncOperationHandle<LocalizationSettings> initializationOperation;
+    private bool localizationReady;
+    private bool synchronizingSelection;
 
     private void Awake()
     {
@@ -41,25 +43,20 @@ public sealed class LanguageDropdownAdapter : MonoBehaviour
 
     private void OnEnable()
     {
+        localizationReady = false;
         LocalizationSettings.SelectedLocaleChanged += SynchronizeSelection;
-    }
-
-    private void Start()
-    {
-        // SelectedLocaleAsync waits until Unity Localization has loaded its locales.
-        initializationOperation = LocalizationSettings.SelectedLocaleAsync;
+        // Locale selection completes before table preloading. Wait for BOTH before
+        // allowing UI callbacks to change locale and invalidate the preload handle.
+        initializationOperation = LocalizationSettings.InitializationOperation;
         if (initializationOperation.IsDone)
-        {
-            SynchronizeSelection(initializationOperation.Result);
-        }
+            OnLocalizationInitialized(initializationOperation);
         else
-        {
             initializationOperation.Completed += OnLocalizationInitialized;
-        }
     }
 
     private void OnDisable()
     {
+        localizationReady = false;
         LocalizationSettings.SelectedLocaleChanged -= SynchronizeSelection;
 
         if (initializationOperation.IsValid() && !initializationOperation.IsDone)
@@ -73,6 +70,8 @@ public sealed class LanguageDropdownAdapter : MonoBehaviour
     /// </summary>
     public void SetLanguage(int selectedIndex)
     {
+        if (!isActiveAndEnabled || !localizationReady || synchronizingSelection) return;
+
         Locale selectedLocale = selectedIndex switch
         {
             0 => englishLocale,
@@ -88,19 +87,25 @@ public sealed class LanguageDropdownAdapter : MonoBehaviour
         }
     }
 
-    private void OnLocalizationInitialized(AsyncOperationHandle<Locale> operation)
+    private void OnLocalizationInitialized(AsyncOperationHandle<LocalizationSettings> operation)
     {
-        SynchronizeSelection(operation.Result);
+        if (!isActiveAndEnabled || operation.Status != AsyncOperationStatus.Succeeded) return;
+        localizationReady = true;
+        SynchronizeSelection(LocalizationSettings.SelectedLocale);
     }
 
     private void SynchronizeSelection(Locale locale)
     {
+        if (!localizationReady || locale == null) return;
+
         Toggle selectedToggle = locale == spanishLocale ? spanishToggle : englishToggle;
 
         if (selectedToggle != null && !selectedToggle.isOn)
         {
             // Notify DropDownGroup so its selected index and visible header stay synchronized.
-            selectedToggle.isOn = true;
+            synchronizingSelection = true;
+            try { selectedToggle.isOn = true; }
+            finally { synchronizingSelection = false; }
         }
     }
 }

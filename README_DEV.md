@@ -403,3 +403,17 @@ exclusion. Device and Play Mode interaction have not been exercised here. Before
 release, open each dropdown in both layouts, select every option using ray and
 poke, close/reopen, switch languages, and verify bottom-row lists remain fully
 inside the surface. Repeat after changing panel size or adding options.
+
+## Watch XR feedback
+
+`Assets/MRF/Scenes/Watch/001Watch.unity` uses `WatchController` and the explicitly
+assigned `MRF/WatchIndicator` shader. The imported `Screen` is resolved beneath
+this watch when its Inspector reference is empty. `CreateScreenGlowAndTiles`
+creates a circular full-face inner glow and four collider-free 3D power tiles.
+The glow is unlit and additive, so the ON state does not require camera bloom.
+The flat ring and four-square symbol stay fixed on the face. Four pre-instantiated cubes are visible only during a transition: they rise without orbiting, rotate around their own axes, and settle over the symbol before hiding.
+Both ON and OFF transitions last four seconds. OFF settles on a black face with blue graphics; ON settles green with the full-face glow;
+`liftHeight` is relative to face diameter. Disable restores tile positions, and
+destruction releases generated objects/materials. Meta poke/ray interaction is unchanged.
+Validate in Play Mode and Quest: toggle ON/OFF, inspect both eyes and oblique angles,
+and disable/re-enable during the lift to check restoration and input subscription.
