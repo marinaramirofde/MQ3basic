@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System;
 using Oculus.Interaction;
 using Oculus.Interaction.Surfaces;
 using UnityEngine;
@@ -14,7 +15,7 @@ public sealed class WatchController : MonoBehaviour
     [SerializeField] private Renderer indicator;
     [SerializeField] private Shader indicatorShader = null;
     [Header("Feedback")]
-    [SerializeField, Min(0.01f)] private float duration = 4f;
+    [SerializeField, Min(0.25f)] private float duration = 2.5f;
     [SerializeField] private Color offColor = new Color(0.015f, 0.65f, 1f, 1f);
     [SerializeField] private Color onColor = new Color(0.08f, 1f, 0.28f, 1f);
     [SerializeField, Min(0)] private float emissionIntensity = 1.8f;
@@ -22,6 +23,7 @@ public sealed class WatchController : MonoBehaviour
     [SerializeField, Min(0)] private float surfaceOffset = 0.003f;
     public bool IsOn { get; private set; }
     public bool IsAnimating => transition != null;
+    public event Action<bool> WhenPowerChanged;
     private Coroutine transition;
     private Quaternion restRotation;
     private Vector3 restPosition;
@@ -38,6 +40,7 @@ public sealed class WatchController : MonoBehaviour
     private readonly Transform[] tiles = new Transform[4];
     private readonly Vector3[] tilePositions = new Vector3[4];
     private float screenSize;
+    private float powerProgress;
     [SerializeField, Min(0)] private float liftHeight = 0.28f;
 
     private void Awake()
@@ -107,7 +110,8 @@ public sealed class WatchController : MonoBehaviour
         indicator.sharedMaterial = indicatorMaterial;
         CreateScreenGlowAndTiles(bounds);
         IsOn = false;
-        ApplyFeedback(offColor, 0);
+        powerProgress = 0f;
+        ApplyFeedback(offColor, 0f, powerProgress);
         initialized = true;
         interactionRoot.SetActive(true);
     }
@@ -134,31 +138,42 @@ public sealed class WatchController : MonoBehaviour
     [ContextMenu("Toggle Watch (Play Mode)")]
     public void Toggle()
     {
-        if (!Application.isPlaying || !isActiveAndEnabled || !initialized || IsAnimating) return;
+        if (!Application.isPlaying || !isActiveAndEnabled || !initialized) return;
+
         IsOn = !IsOn;
+        WhenPowerChanged?.Invoke(IsOn);
         Debug.Log(IsOn ? "Watch ON" : "Watch OFF", this);
-        transition = StartCoroutine(Animate());
+
+        if (transition != null) StopCoroutine(transition);
+        transition = StartCoroutine(AnimateTo(IsOn ? 1f : 0f));
     }
 
-    private IEnumerator Animate()
+    private IEnumerator AnimateTo(float target)
     {
-        Color from = IsOn ? offColor : onColor;
-        Color to = IsOn ? onColor : offColor;
-        float elapsed = 0;
-        float seconds = Mathf.Max(4f, duration);
+        float start = powerProgress;
+        float distance = Mathf.Abs(target - start);
+        float seconds = Mathf.Max(0.25f, duration) * distance;
+        float elapsed = 0f;
+
         tilesRoot.SetActive(true);
         while (elapsed < seconds)
         {
-            float t = elapsed / seconds;
-            float eased = Mathf.SmoothStep(0, 1, t);
-            Color transitionColor = Color.Lerp(from, to, eased);
-            AnimateTiles(t);
-            ApplyFeedback(transitionColor, Mathf.Sin(Mathf.PI * t), IsOn ? eased : 1 - eased);
+            float normalizedTime = elapsed / seconds;
+            float eased = Mathf.SmoothStep(0f, 1f, normalizedTime);
+            powerProgress = Mathf.Lerp(start, target, eased);
+            Color transitionColor = Color.Lerp(offColor, onColor, powerProgress);
+            float pulse = Mathf.Sin(Mathf.PI * powerProgress);
+
+            AnimateTiles(powerProgress);
+            ApplyFeedback(transitionColor, pulse, powerProgress);
+
             elapsed += Time.deltaTime;
             yield return null;
         }
-        AnimateTiles(0);
-        ApplyFeedback(to, 0);
+
+        powerProgress = target;
+        AnimateTiles(powerProgress);
+        ApplyFeedback(Color.Lerp(offColor, onColor, powerProgress), 0f, powerProgress);
         tilesRoot.SetActive(false);
         transition = null;
     }
@@ -268,8 +283,10 @@ public sealed class WatchController : MonoBehaviour
         transition = null;
         screen.localRotation = restRotation;
         screen.localPosition = restPosition;
-        AnimateTiles(0);
-        ApplyFeedback(IsOn ? onColor : offColor, 0);
+        powerProgress = IsOn ? 1f : 0f;
+        AnimateTiles(powerProgress);
+        tilesRoot.SetActive(false);
+        ApplyFeedback(Color.Lerp(offColor, onColor, powerProgress), 0f, powerProgress);
     }
 
     private void OnDestroy()
