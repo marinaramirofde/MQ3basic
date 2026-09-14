@@ -11,49 +11,13 @@ public enum WatchMenuAnchorMode
     RightController
 }
 
-[Serializable]
-public sealed class WatchShortcutDefinition
-{
-    [SerializeField] private string label = "Shortcut";
-    [SerializeField] private string description = "Text try";
-    [SerializeField] private Sprite icon;
-    [SerializeField] private Button button;
-    [SerializeField] private TMP_Text labelText;
-    [SerializeField] private TMP_Text descriptionText;
-    [SerializeField] private Image iconImage;
-    [SerializeField] private UnityEvent onInvoked = new UnityEvent();
-
-    public UnityEvent OnInvoked => onInvoked;
-
-    public void ApplyPresentation()
-    {
-        if (labelText != null) labelText.text = label;
-        if (descriptionText != null) descriptionText.text = description;
-        if (iconImage != null && icon != null) iconImage.sprite = icon;
-    }
-
-    public void Bind()
-    {
-        if (button != null) button.onClick.AddListener(Invoke);
-    }
-
-    public void Unbind()
-    {
-        if (button != null) button.onClick.RemoveListener(Invoke);
-    }
-
-    private void Invoke()
-    {
-        onInvoked.Invoke();
-    }
-}
-
 /// <summary>Controls the Meta UI shortcut panel attached to the watch or either controller.</summary>
 [DisallowMultipleComponent]
 public sealed class WatchShortcutMenuController : MonoBehaviour
 {
     [Header("Watch")]
     [SerializeField] private WatchController watch;
+    [SerializeField] private bool controlledByManager;
 
     [Header("Panel")]
     [SerializeField] private RectTransform menuRoot;
@@ -117,8 +81,11 @@ public sealed class WatchShortcutMenuController : MonoBehaviour
     private void OnEnable()
     {
         if (!initialized) return;
-        watch.WhenPowerChanged += HandlePowerChanged;
-        SetOpen(watch.IsOn);
+        if (!controlledByManager)
+        {
+            watch.WhenPowerChanged += HandlePowerChanged;
+            SetOpen(watch.IsOn);
+        }
     }
 
     public void SetAnchorMode(WatchMenuAnchorMode mode)
@@ -141,7 +108,7 @@ public sealed class WatchShortcutMenuController : MonoBehaviour
         SetOpen(isOn);
     }
 
-    private void SetOpen(bool open)
+    public void SetOpen(bool open)
     {
         IsOpen = open;
         menuRoot.gameObject.SetActive(open);
@@ -196,6 +163,7 @@ public sealed class WatchShortcutMenuController : MonoBehaviour
 
     private void ApplyPhysicalPanelScale()
     {
+        if (menuRoot == null) return;
         float canvasWidth = Mathf.Max(1f, menuRoot.rect.width);
         float targetWorldScale = panelWidthMeters * panelScaleMultiplier / canvasWidth;
         Vector3 parentScale = menuRoot.parent != null ? menuRoot.parent.lossyScale : Vector3.one;
@@ -233,7 +201,7 @@ public sealed class WatchShortcutMenuController : MonoBehaviour
 
     private bool ValidateReferences()
     {
-        bool valid = watch != null && menuRoot != null && canvasGroup != null &&
+        bool valid = (controlledByManager || watch != null) && menuRoot != null && canvasGroup != null &&
             wristMenuAnchor != null && menuAttachment != null && shortcuts != null && shortcuts.Length == 3;
         if (!valid) Debug.LogError("Watch shortcut menu has missing Inspector references.", this);
         return valid;
@@ -264,7 +232,7 @@ public sealed class WatchShortcutMenuController : MonoBehaviour
     private void OnDisable()
     {
         if (!initialized) return;
-        watch.WhenPowerChanged -= HandlePowerChanged;
+        if (watch != null) watch.WhenPowerChanged -= HandlePowerChanged;
         SetOpen(false);
     }
 

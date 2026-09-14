@@ -46,6 +46,7 @@ internal static class WatchShortcutMenuSceneBuilder
             if (controller == null) throw new InvalidOperationException("002Watch has no shortcut menu controller.");
             RepairShortcutReferences(scene, controller);
             EnsureSettingsToggle(scene, controller);
+            EnsureModuleManager(scene, controller);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
@@ -54,6 +55,26 @@ internal static class WatchShortcutMenuSceneBuilder
         {
             if (openedTemporarily && scene.IsValid()) EditorSceneManager.CloseScene(scene, true);
         }
+    }
+
+    private static void EnsureModuleManager(Scene scene, WatchShortcutMenuController presenter)
+    {
+        var manager = FindComponent<WatchModuleManager>(scene);
+        if (manager == null) return;
+        var menu = new SerializedObject(presenter);
+        menu.FindProperty("controlledByManager").boolValue = true;
+        menu.ApplyModifiedPropertiesWithoutUndo();
+        var settings = new SerializedObject(manager);
+        var options = settings.FindProperty("menus");
+        for (int i = 0; i < options.arraySize; i++)
+        {
+            var option = options.GetArrayElementAtIndex(i);
+            if (option.FindPropertyRelative("label").stringValue == "Shortcuts" &&
+                option.FindPropertyRelative("root").objectReferenceValue == null &&
+                option.FindPropertyRelative("shortcutPresenter").objectReferenceValue == null)
+                option.FindPropertyRelative("shortcutPresenter").objectReferenceValue = presenter;
+        }
+        settings.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void BuildScene(bool rebuild)
@@ -72,6 +93,7 @@ internal static class WatchShortcutMenuSceneBuilder
             {
                 RepairShortcutReferences(scene, existingController);
                 EnsureSettingsToggle(scene, existingController);
+                EnsureModuleManager(scene, existingController);
                 GameObject existingAttachment = FindGameObject(scene, "ShortcutMenuAttachment");
                 EnsureMenuPrefabInstance(scene, existingAttachment, existing);
                 return;
@@ -181,6 +203,7 @@ internal static class WatchShortcutMenuSceneBuilder
             ConfigureController(controller, watch, menuRoot, canvasGroup, background, border,
                 titleText, attachment, wristAnchor, leftAnchor, rightAnchor, buttons, labels, descriptions, icons);
             EnsureSettingsToggle(scene, controller);
+            EnsureModuleManager(scene, controller);
             menuObject.SetActive(true);
             EnsureMenuPrefabInstance(scene, attachmentObject, menuObject);
 

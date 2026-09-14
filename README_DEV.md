@@ -1,4 +1,4 @@
-# MQ3basic — Developer Guide
+# MQ3basic â€” Developer Guide
 
 This document records the custom modules added to the project, their locations,
 their scene dependencies, and the Inspector wiring required to reuse them.
@@ -75,12 +75,12 @@ Design responsibilities remain separated:
 
 ```text
 Assets/MRF/Scripts/Visualization/
-├── VisualizationMode.cs
-├── VisualizationModeController.cs
-└── VisualizationModeDropdownAdapter.cs
+â”œâ”€â”€ VisualizationMode.cs
+â”œâ”€â”€ VisualizationModeController.cs
+â””â”€â”€ VisualizationModeDropdownAdapter.cs
 
 Assets/MRF/Shaders/
-└── PassthroughFader.shader
+â””â”€â”€ PassthroughFader.shader
 ```
 
 `VisualizationModeController` replaced the earlier `VirtualPassthroughFader`. Its `.meta`
@@ -177,7 +177,7 @@ component or its options for both settings.
 
 ```text
 VisualizationModeDropdown
-└── VisualizationModeDropdownAdapter.SetMode(int)
+â””â”€â”€ VisualizationModeDropdownAdapter.SetMode(int)
 ```
 
 Use the dynamic `SetMode(Int32)` entry so the emitted dropdown index is passed through.
@@ -234,7 +234,7 @@ Scene: `Assets/MRF/Scenes/SettingUI/004SettingUI.unity`
 
 - Uses Unity Localization `1.5.9` and its Addressables dependency.
 - Locales and the `Settings UI` String Table are under `Assets/MRF/Localization`.
-- Dropdown order: `0 = English`, `1 = Español`; English is the serialized default and its visible dynamic event calls `LanguageDropdownAdapter.SetLanguage(int)`.
+- Dropdown order: `0 = English`, `1 = EspaÃ±ol`; English is the serialized default and its visible dynamic event calls `LanguageDropdownAdapter.SetLanguage(int)`.
 - All dropdown, Locale and Toggle references are assigned explicitly in the Inspector.
 - Startup priority is saved PlayerPrefs locale, Quest/system locale, then English fallback; the adapter writes the `selected-locale` key on each user change. This follows Meta's recommended behavior for unsupported device languages.
 - Add future translations by creating another Locale/table column, then add its explicit dropdown option and adapter reference.
@@ -261,14 +261,14 @@ separate project-specific String or Asset Table Collections instead of adding it
 - Set Player Stance to `Standing` by default in `004SettingUI` and serialized its dropdown references.
 
 
-### 2026-08-28 — 002SettingUI dropdown conversion
+### 2026-08-28 â€” 002SettingUI dropdown conversion
 
 - Replaced the active Themes and Visualization Mode button grids with independent dropdowns.
 - Serialized all option Toggle references in enum/theme order.
 - Connected visible dynamic-Int32 events directly to the existing domain controllers.
 - Kept the former button grids inactive for safe visual comparison or recovery.
 
-### 2026-08-28 — Visualization modes
+### 2026-08-28 â€” Visualization modes
 
 - Added the `VisualizationMode` enum with Virtual, Passthrough, and Focus values.
 - Replaced `VirtualPassthroughFader` with the modular `VisualizationModeController`.
@@ -417,3 +417,27 @@ Both ON and OFF transitions last four seconds. OFF settles on a black face with 
 destruction releases generated objects/materials. Meta poke/ray interaction is unchanged.
 Validate in Play Mode and Quest: toggle ON/OFF, inspect both eyes and oblique angles,
 and disable/re-enable during the lift to check restoration and input subscription.
+
+## 003Watch modular wrist system
+
+`SceneModules` contains one `SceneModuleManager`, which owns selection, activation
+state and the connections between device input, style and menu. The separate
+coordinator and its empty hierarchy container have been removed; the existing
+serialized settings and events were transferred to the manager.
+
+- Device prefabs own their input, compatible styles and menu anchor. The shared
+  wrist slot changes hands without duplicating the device.
+- `DeviceAnchoredMenuPresenter` owns one menu's visibility and placement;
+  `ShortcutMenuContent` owns its content. Shortcuts is an independent scene root, referenced by SceneModules.
+  SceneModules contains only the manager; menu prefabs stay outside its hierarchy.
+  At runtime only the menu attachment follows the selected device anchor.
+- SceneModules is the only customization panel. IDs remain internal; named options
+  and editor drag registration support customization without Tools commands.
+- Optional saved selections contain choices and checkboxes only. Style resources
+  are released before replacement; disabling activation closes the owned menu.
+
+Validation: compilation and activation-state checks pass. Static scene checks
+confirm unique object IDs, preserved settings and removed coordinator references.
+The earlier migration passed 14 Unity binding checks; the latest consolidation
+still needs Unity Play Mode and Quest verification. See
+`Assets/MRF/Scripts/Modules/Wrist/QUICK_START.md` for usage.

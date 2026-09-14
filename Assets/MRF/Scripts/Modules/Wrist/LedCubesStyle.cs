@@ -1,18 +1,13 @@
 using System.Collections;
-using System.Collections.Generic;
-using System;
-using Oculus.Interaction;
-using Oculus.Interaction.Surfaces;
 using UnityEngine;
-
-/// <summary>Self-contained visual watch prototype. Uses the scene's Meta ISDK interactors.</summary>
-[DisallowMultipleComponent]
-public sealed class WatchController : MonoBehaviour
+namespace MRF.Modules.Wrist
 {
-    [Header("Model (resolved under this watch if empty)")]
+/// <summary>The LedCubes presentation only. Device input and menus are separate modules.</summary>
+public sealed class LedCubesStyle : WristStyle
+{
+    [Header("Style-local model references")]
     [SerializeField] private Transform screen;
     [SerializeField] private Renderer screenRenderer;
-    [SerializeField] private Renderer indicator;
     [SerializeField] private Shader indicatorShader = null;
     [Header("Feedback")]
     [SerializeField, Min(0.25f)] private float duration = 2.5f;
@@ -21,78 +16,49 @@ public sealed class WatchController : MonoBehaviour
     [SerializeField, Min(0)] private float emissionIntensity = 1.8f;
     [SerializeField, Range(0.1f, 0.8f)] private float indicatorSize = 0.5f;
     [SerializeField, Min(0)] private float surfaceOffset = 0.003f;
-    public bool IsOn { get; private set; }
-    public bool IsAnimating => transition != null;
-    public event Action<bool> WhenPowerChanged;
-    public enum AnimationMode { Cubes, Immediate, CustomAnimator }
-    private AnimationMode animationMode;
-    private Animator customAnimator;
-    private string powerParameter = "IsOn";
-    private bool activationEnabled = true;
-
-    public void SetActivationEnabled(bool value)
-    {
-        activationEnabled = value;
-        heldPointers.Clear();
-        if (interactionRoot != null) interactionRoot.SetActive(value && isActiveAndEnabled);
-        if (!value) SetPower(false);
-    }
-
-    public void ConfigureAnimation(AnimationMode mode, Animator animator, string parameter)
-    {
-        if (customAnimator != null) customAnimator.SetBool(powerParameter, false);
-        animationMode = mode;
-        customAnimator = animator;
-        powerParameter = parameter;
-        if (!initialized) return;
-        if (transition != null) StopCoroutine(transition);
-        transition = null;
-        ApplyImmediatePower();
-    }
-
-    private void ApplyImmediatePower()
-    {
-        powerProgress = IsOn ? 1f : 0f;
-        AnimateTiles(powerProgress);
-        tilesRoot.SetActive(false);
-        ApplyFeedback(IsOn ? onColor : offColor, 0f, powerProgress);
-        if (animationMode == AnimationMode.CustomAnimator && customAnimator != null)
-            customAnimator.SetBool(powerParameter, IsOn);
-    }
-
+    private bool IsOn;
+    public override bool IsAnimating => transition != null;
     private Coroutine transition;
-    private Quaternion restRotation;
-    private Vector3 restPosition;
-    private GameObject interactionRoot, indicatorObject;
-    private PokeInteractable poke;
-    private RayInteractable ray;
+    private Renderer indicator;
+    private GameObject indicatorObject, glowObject, tilesRoot;
     private Material[] originals, materials;
-    private Material indicatorMaterial, originalIndicatorMaterial;
+    private Material indicatorMaterial, originalIndicatorMaterial, glowMaterial, tileMaterial;
     private Mesh indicatorMesh;
-    private readonly HashSet<int> heldPointers = new HashSet<int>();
     private bool initialized;
-    private GameObject glowObject, tilesRoot;
-    private Material glowMaterial, tileMaterial;
     private readonly Transform[] tiles = new Transform[4];
     private readonly Vector3[] tilePositions = new Vector3[4];
-    private float screenSize;
-    private float powerProgress;
+    private float screenSize, powerProgress;
     [SerializeField, Min(0)] private float liftHeight = 0.28f;
 
-    private void Awake()
+    public override bool Activate(bool on, bool animate)
     {
-        if (screen == null)
-            foreach (Transform child in GetComponentsInChildren<Transform>(true))
-                if (child.name == "Screen") { screen = child; break; }
-        if (screen != null && screenRenderer == null) screenRenderer = screen.GetComponent<Renderer>();
+        if (!initialized && !InitializeVisuals()) return false;
+        SetPower(on, animate);
+        return true;
+    }
+    public override void SetPower(bool on, bool animate)
+    {
+        if (!initialized) return;
+        IsOn = on;
+        if (transition != null) StopCoroutine(transition);
+        transition = null;
+        if (animate && isActiveAndEnabled && !Mathf.Approximately(powerProgress, on ? 1 : 0))
+            transition = StartCoroutine(AnimateTo(on ? 1f : 0f));
+        else
+        {
+            powerProgress = on ? 1 : 0;
+            AnimateTiles(powerProgress);
+            ApplyFeedback(on ? onColor : offColor, 0, powerProgress);
+            tilesRoot.SetActive(false);
+        }
+    }
+    private bool InitializeVisuals()
+    {
         if (screen == null || screenRenderer == null || indicatorShader == null)
         {
-            Debug.LogError("Watch: Screen, renderer or indicator shader is missing.", this);
-            enabled = false;
-            return;
+            Debug.LogError("LedCubes requires explicit screen, renderer and shader references.", this);
+            return false;
         }
-        restRotation = screen.localRotation;
-        restPosition = screen.localPosition;
         Bounds bounds = screenRenderer.localBounds;
         
         originals = screenRenderer.sharedMaterials;
@@ -104,24 +70,6 @@ public sealed class WatchController : MonoBehaviour
             materials[i].EnableKeyword("_EMISSION");
         }
         screenRenderer.sharedMaterials = materials;
-
-        // The imported Screen lies in XZ. Keep the hit surface outside the rotating transform.
-        interactionRoot = new GameObject("Screen Interaction (Meta ISDK)");
-        interactionRoot.SetActive(false);
-        interactionRoot.transform.SetParent(screen.parent, false);
-        interactionRoot.transform.localPosition = restPosition + restRotation *
-            Vector3.Scale(new Vector3(bounds.center.x, bounds.max.y + surfaceOffset, bounds.center.z), screen.localScale);
-        interactionRoot.transform.localRotation = restRotation * Quaternion.Euler(-90, 0, 0);
-        interactionRoot.transform.localScale = screen.localScale;
-        var plane = interactionRoot.AddComponent<PlaneSurface>();
-        plane.InjectAllPlaneSurface(PlaneSurface.NormalFacing.Forward, false);
-        var circle = interactionRoot.AddComponent<CircleSurface>();
-        circle.InjectAllCircleSurface(plane);
-        circle.InjectOptionalRadius(Mathf.Min(bounds.extents.x, bounds.extents.z));
-        poke = interactionRoot.AddComponent<PokeInteractable>();
-        poke.InjectAllPokeInteractable(circle);
-        ray = interactionRoot.AddComponent<RayInteractable>();
-        ray.InjectAllRayInteractable(circle);
 
         indicatorMaterial = new Material(indicatorShader);
         if (indicator == null)
@@ -145,53 +93,9 @@ public sealed class WatchController : MonoBehaviour
         originalIndicatorMaterial = indicator.sharedMaterial;
         indicator.sharedMaterial = indicatorMaterial;
         CreateScreenGlowAndTiles(bounds);
-        IsOn = false;
-        powerProgress = 0f;
-        ApplyFeedback(offColor, 0f, powerProgress);
         initialized = true;
-        interactionRoot.SetActive(activationEnabled && isActiveAndEnabled);
+        return true;
     }
-
-    private void OnEnable()
-    {
-        if (!initialized) return;
-        poke.WhenPointerEventRaised += OnPointer;
-        ray.WhenPointerEventRaised += OnPointer;
-        interactionRoot.SetActive(activationEnabled && isActiveAndEnabled);
-    }
-
-    private void OnPointer(PointerEvent evt)
-    {
-        if (evt.Type == PointerEventType.Select)
-        {
-            bool wasReleased = heldPointers.Count == 0;
-            if (heldPointers.Add(evt.Identifier) && wasReleased) Toggle();
-        }
-        else if (evt.Type == PointerEventType.Unselect || evt.Type == PointerEventType.Cancel)
-            heldPointers.Remove(evt.Identifier);
-    }
-
-    [ContextMenu("Toggle Watch (Play Mode)")]
-    public void Toggle()
-    {
-        SetPower(!IsOn);
-    }
-
-    public void SetPower(bool value)
-    {
-        if (!Application.isPlaying || !initialized ||
-            (value && (!isActiveAndEnabled || !activationEnabled)) || IsOn == value) return;
-        IsOn = value;
-        WhenPowerChanged?.Invoke(IsOn);
-        Debug.Log(IsOn ? "Watch ON" : "Watch OFF", this);
-
-        if (transition != null) StopCoroutine(transition);
-        transition = null;
-        if (animationMode == AnimationMode.Cubes && activationEnabled && isActiveAndEnabled)
-            transition = StartCoroutine(AnimateTo(IsOn ? 1f : 0f));
-        else ApplyImmediatePower();
-    }
-
     private IEnumerator AnimateTo(float target)
     {
         float start = powerProgress;
@@ -316,26 +220,14 @@ public sealed class WatchController : MonoBehaviour
         if (material.HasProperty(property)) material.SetColor(property, value);
     }
 
-    private void OnDisable()
+    public override void Deactivate()
     {
         if (!initialized) return;
-        SetPower(false);
-        poke.WhenPointerEventRaised -= OnPointer;
-        ray.WhenPointerEventRaised -= OnPointer;
-        interactionRoot.SetActive(false);
-        heldPointers.Clear();
         if (transition != null) StopCoroutine(transition);
         transition = null;
-        screen.localRotation = restRotation;
-        screen.localPosition = restPosition;
-        powerProgress = IsOn ? 1f : 0f;
-        AnimateTiles(powerProgress);
-        tilesRoot.SetActive(false);
-        ApplyFeedback(Color.Lerp(offColor, onColor, powerProgress), 0f, powerProgress);
-    }
-
-    private void OnDestroy()
-    {
+        if (glowObject != null) glowObject.SetActive(false);
+        if (tilesRoot != null) tilesRoot.SetActive(false);
+        if (indicatorObject != null) indicatorObject.SetActive(false);
         if (screenRenderer != null && originals != null) screenRenderer.sharedMaterials = originals;
         if (materials != null) foreach (Material material in materials) if (material != null) Destroy(material);
         if (indicator != null) indicator.sharedMaterial = originalIndicatorMaterial;
@@ -346,6 +238,14 @@ public sealed class WatchController : MonoBehaviour
         if (indicatorMaterial != null) Destroy(indicatorMaterial);
         if (indicatorMesh != null) Destroy(indicatorMesh);
         if (indicatorObject != null) Destroy(indicatorObject);
-        if (interactionRoot != null) Destroy(interactionRoot);
+        originals = null;
+        materials = null;
+        indicator = null;
+        indicatorObject = null;
+        indicatorMesh = null;
+        glowObject = null;
+        tilesRoot = null;
+        initialized = false;
     }
+}
 }

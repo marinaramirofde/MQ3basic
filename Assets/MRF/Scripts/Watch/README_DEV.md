@@ -73,3 +73,27 @@ Normal content and pose changes should be made through the Hierarchy, Prefab Mod
 7. Watch ON/OFF and cube motion remain interruptible.
 8. Poke, hand ray and controller ray each invoke a shortcut once.
 9. `001Watch.unity` remains unchanged.
+
+## 003Watch modular wrist system
+
+`SceneModules` contains one `SceneModuleManager`, which owns selection, activation
+state and the connections between device input, style and menu. The separate
+coordinator and its empty hierarchy container have been removed; the existing
+serialized settings and events were transferred to the manager.
+
+- Device prefabs own their input, compatible styles and menu anchor. The shared
+  wrist slot changes hands without duplicating the device.
+- `DeviceAnchoredMenuPresenter` owns one menu's visibility and placement;
+  `ShortcutMenuContent` owns its content. Shortcuts is an independent scene root, referenced by SceneModules.
+  SceneModules contains only the manager; menu prefabs stay outside its hierarchy.
+  At runtime only the menu attachment follows the selected device anchor.
+- SceneModules is the only customization panel. IDs remain internal; named options
+  and editor drag registration support customization without Tools commands.
+- Optional saved selections contain choices and checkboxes only. Style resources
+  are released before replacement; disabling activation closes the owned menu.
+
+Validation: compilation and activation-state checks pass. Static scene checks
+confirm unique object IDs, preserved settings and removed coordinator references.
+The earlier migration passed 14 Unity binding checks; the latest consolidation
+still needs Unity Play Mode and Quest verification. See
+`Assets/MRF/Scripts/Modules/Wrist/QUICK_START.md` for usage.
